@@ -1,44 +1,111 @@
+
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/IconSymbol";
-import { GlassView } from "expo-glass-effect";
-import { useTheme } from "@react-navigation/native";
+import { colors } from "@/styles/commonStyles";
 
 export default function ProfileScreen() {
-  const theme = useTheme();
-
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[
-          styles.contentContainer,
-          Platform.OS !== 'ios' && styles.contentContainerWithTabBar
-        ]}
+        contentContainerStyle={styles.contentContainer}
       >
-        <GlassView style={[
-          styles.profileHeader,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          <IconSymbol ios_icon_name="person.circle.fill" android_material_icon_name="person" size={80} color={theme.colors.primary} />
-          <Text style={[styles.name, { color: theme.colors.text }]}>John Doe</Text>
-          <Text style={[styles.email, { color: theme.dark ? '#98989D' : '#666' }]}>john.doe@example.com</Text>
-        </GlassView>
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            <IconSymbol 
+              ios_icon_name="person.circle.fill" 
+              android_material_icon_name="person" 
+              size={80} 
+              color={colors.primary} 
+            />
+          </View>
+          <Text style={styles.name}>Dog Trainer</Text>
+          <Text style={styles.email}>trainer@dogtraining.com</Text>
+        </View>
 
-        <GlassView style={[
-          styles.section,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          <View style={styles.infoRow}>
-            <IconSymbol ios_icon_name="phone.fill" android_material_icon_name="phone" size={20} color={theme.dark ? '#98989D' : '#666'} />
-            <Text style={[styles.infoText, { color: theme.colors.text }]}>+1 (555) 123-4567</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About This App</Text>
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <IconSymbol 
+                ios_icon_name="lightbulb.fill" 
+                android_material_icon_name="lightbulb" 
+                size={24} 
+                color={colors.accent} 
+              />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>AI-Powered Guidance</Text>
+                <Text style={styles.infoText}>
+                  Get research-backed training advice tailored to your specific situation
+                </Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.infoRow}>
-            <IconSymbol ios_icon_name="location.fill" android_material_icon_name="location-on" size={20} color={theme.dark ? '#98989D' : '#666'} />
-            <Text style={[styles.infoText, { color: theme.colors.text }]}>San Francisco, CA</Text>
+
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <IconSymbol 
+                ios_icon_name="book.fill" 
+                android_material_icon_name="book" 
+                size={24} 
+                color={colors.secondary} 
+              />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>Evidence-Based</Text>
+                <Text style={styles.infoText}>
+                  All recommendations are backed by scientific research and expert knowledge
+                </Text>
+              </View>
+            </View>
           </View>
-        </GlassView>
+
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <IconSymbol 
+                ios_icon_name="chart.bar.fill" 
+                android_material_icon_name="bar-chart" 
+                size={24} 
+                color={colors.highlight} 
+              />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>Track Progress</Text>
+                <Text style={styles.infoText}>
+                  Log your training sessions and monitor improvement over time
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Features</Text>
+          {[
+            { icon: 'search', text: 'AI-powered search for training advice' },
+            { icon: 'list', text: 'Training log to track sessions' },
+            { icon: 'auto-awesome', text: 'Related questions and suggestions' },
+            { icon: 'verified', text: 'Research-backed recommendations' }
+          ].map((feature, index) => (
+            <React.Fragment key={index}>
+              <View style={styles.featureItem}>
+                <IconSymbol 
+                  ios_icon_name="checkmark.circle.fill" 
+                  android_material_icon_name={feature.icon} 
+                  size={20} 
+                  color={colors.primary} 
+                />
+                <Text style={styles.featureText}>{feature.text}</Text>
+              </View>
+            </React.Fragment>
+          ))}
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            This app provides general guidance. Always consult with a professional dog trainer for specific behavioral issues.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -47,45 +114,99 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    // backgroundColor handled dynamically
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
+    paddingTop: Platform.OS === 'android' ? 48 : 20,
+    paddingHorizontal: 20,
+    paddingBottom: 120,
   },
-  contentContainerWithTabBar: {
-    paddingBottom: 100, // Extra padding for floating tab bar
-  },
-  profileHeader: {
+  header: {
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 32,
+    marginBottom: 32,
+  },
+  avatarContainer: {
     marginBottom: 16,
-    gap: 12,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    // color handled dynamically
+    color: colors.text,
+    marginBottom: 4,
   },
   email: {
     fontSize: 16,
-    // color handled dynamically
+    color: colors.textSecondary,
   },
   section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  card: {
+    backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 20,
-    gap: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
   },
   infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'flex-start',
+  },
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
   },
   infoText: {
-    fontSize: 16,
-    // color handled dynamically
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+  },
+  featureText: {
+    fontSize: 15,
+    color: colors.text,
+    marginLeft: 12,
+    flex: 1,
+  },
+  footer: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
+  },
+  footerText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });
