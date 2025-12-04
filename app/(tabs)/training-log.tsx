@@ -8,11 +8,14 @@ import {
   ScrollView, 
   TouchableOpacity,
   Platform,
-  Modal
+  Modal,
+  Image,
+  Alert
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
+import * as ImagePicker from 'expo-image-picker';
 
 interface TrainingEntry {
   id: string;
@@ -22,7 +25,23 @@ interface TrainingEntry {
   notes: string;
   duration: string;
   success: 'high' | 'medium' | 'low';
+  photos?: string[];
+  goals?: string;
+  nextSteps?: string;
 }
+
+const activityTypes = [
+  'Leash Training',
+  'Obedience',
+  'Scent Work',
+  'Agility',
+  'Socialization',
+  'Trick Training',
+  'Behavioral Modification',
+  'Recall Training',
+  'Crate Training',
+  'Other'
+];
 
 export default function TrainingLogScreen() {
   const [entries, setEntries] = useState<TrainingEntry[]>([
@@ -31,33 +50,43 @@ export default function TrainingLogScreen() {
       dogName: 'Max',
       date: '2024-01-15',
       activity: 'Leash Training',
-      notes: 'Practiced loose leash walking in the park. Max showed improvement with fewer pulls.',
+      notes: 'Practiced loose leash walking in the park. Max showed significant improvement with fewer pulls. Used high-value treats and the stop-and-go method.',
       duration: '30 min',
-      success: 'high'
+      success: 'high',
+      goals: 'Walk entire block without pulling',
+      nextSteps: 'Practice in more distracting environment'
     },
     {
       id: '2',
       dogName: 'Bella',
       date: '2024-01-14',
       activity: 'Scent Work',
-      notes: 'Introduced basic scent detection games. Bella was very engaged and found treats quickly.',
+      notes: 'Introduced basic scent detection games using treats hidden in boxes. Bella was very engaged and found treats quickly. Started with 3 boxes, progressed to 5.',
       duration: '15 min',
-      success: 'high'
+      success: 'high',
+      goals: 'Find hidden treats in 5 boxes',
+      nextSteps: 'Introduce essential oil scents'
     }
   ]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<TrainingEntry | null>(null);
   const [newEntry, setNewEntry] = useState<Partial<TrainingEntry>>({
     dogName: '',
     activity: '',
     notes: '',
     duration: '',
-    success: 'medium'
+    success: 'medium',
+    photos: [],
+    goals: '',
+    nextSteps: ''
   });
+  const [filterSuccess, setFilterSuccess] = useState<string>('all');
 
   const handleAddEntry = () => {
     console.log('Adding new entry');
     if (!newEntry.dogName || !newEntry.activity) {
-      console.log('Missing required fields');
+      Alert.alert('Missing Information', 'Please enter dog name and activity type.');
       return;
     }
 
@@ -68,7 +97,10 @@ export default function TrainingLogScreen() {
       activity: newEntry.activity || '',
       notes: newEntry.notes || '',
       duration: newEntry.duration || '',
-      success: newEntry.success || 'medium'
+      success: newEntry.success || 'medium',
+      photos: newEntry.photos || [],
+      goals: newEntry.goals || '',
+      nextSteps: newEntry.nextSteps || ''
     };
 
     setEntries([entry, ...entries]);
@@ -77,15 +109,62 @@ export default function TrainingLogScreen() {
       activity: '',
       notes: '',
       duration: '',
-      success: 'medium'
+      success: 'medium',
+      photos: [],
+      goals: '',
+      nextSteps: ''
     });
     setShowAddModal(false);
     console.log('Entry added successfully');
   };
 
   const handleDeleteEntry = (id: string) => {
-    console.log('Deleting entry:', id);
-    setEntries(entries.filter(entry => entry.id !== id));
+    Alert.alert(
+      'Delete Entry',
+      'Are you sure you want to delete this training entry?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            console.log('Deleting entry:', id);
+            setEntries(entries.filter(entry => entry.id !== id));
+            setShowDetailModal(false);
+          }
+        }
+      ]
+    );
+  };
+
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets) {
+      const newPhotos = result.assets.map(asset => asset.uri);
+      setNewEntry({
+        ...newEntry,
+        photos: [...(newEntry.photos || []), ...newPhotos]
+      });
+      console.log('Photos added:', newPhotos.length);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    const updatedPhotos = [...(newEntry.photos || [])];
+    updatedPhotos.splice(index, 1);
+    setNewEntry({ ...newEntry, photos: updatedPhotos });
   };
 
   const getSuccessColor = (success: string) => {
@@ -114,13 +193,27 @@ export default function TrainingLogScreen() {
     }
   };
 
+  const filteredEntries = filterSuccess === 'all' 
+    ? entries 
+    : entries.filter(entry => entry.success === filterSuccess);
+
+  const getStats = () => {
+    const total = entries.length;
+    const high = entries.filter(e => e.success === 'high').length;
+    const medium = entries.filter(e => e.success === 'medium').length;
+    const low = entries.filter(e => e.success === 'low').length;
+    return { total, high, medium, low };
+  };
+
+  const stats = getStats();
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Training Log</Text>
-            <Text style={styles.subtitle}>Track your training sessions</Text>
+            <Text style={styles.subtitle}>Track progress & celebrate wins</Text>
           </View>
           <TouchableOpacity 
             style={styles.addButton}
@@ -138,11 +231,61 @@ export default function TrainingLogScreen() {
           </TouchableOpacity>
         </View>
 
+        {entries.length > 0 && (
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.total}</Text>
+              <Text style={styles.statLabel}>Total Sessions</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.highlight + '30' }]}>
+              <Text style={styles.statNumber}>{stats.high}</Text>
+              <Text style={styles.statLabel}>High Success</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.accent + '30' }]}>
+              <Text style={styles.statNumber}>{stats.medium}</Text>
+              <Text style={styles.statLabel}>Medium</Text>
+            </View>
+          </View>
+        )}
+
+        {entries.length > 0 && (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterContainer}
+            contentContainerStyle={styles.filterContent}
+          >
+            {[
+              { label: 'All', value: 'all' },
+              { label: 'High Success', value: 'high' },
+              { label: 'Medium', value: 'medium' },
+              { label: 'Low', value: 'low' }
+            ].map((filter, index) => (
+              <React.Fragment key={index}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    filterSuccess === filter.value && styles.filterButtonActive
+                  ]}
+                  onPress={() => setFilterSuccess(filter.value)}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    filterSuccess === filter.value && styles.filterButtonTextActive
+                  ]}>
+                    {filter.label}
+                  </Text>
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </ScrollView>
+        )}
+
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.contentContainer}
         >
-          {entries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <View style={styles.emptyState}>
               <IconSymbol 
                 ios_icon_name="book.closed" 
@@ -150,80 +293,104 @@ export default function TrainingLogScreen() {
                 size={64} 
                 color={colors.textSecondary} 
               />
-              <Text style={styles.emptyText}>No training entries yet</Text>
+              <Text style={styles.emptyText}>
+                {entries.length === 0 ? 'No training entries yet' : 'No entries match filter'}
+              </Text>
               <Text style={styles.emptySubtext}>
-                Tap the + button to add your first entry
+                {entries.length === 0 
+                  ? 'Tap the + button to add your first entry'
+                  : 'Try selecting a different filter'}
               </Text>
             </View>
           ) : (
-            entries.map((entry, index) => (
+            filteredEntries.map((entry, index) => (
               <React.Fragment key={index}>
-                <View style={styles.entryCard}>
+                <TouchableOpacity 
+                  style={styles.entryCard}
+                  onPress={() => {
+                    setSelectedEntry(entry);
+                    setShowDetailModal(true);
+                  }}
+                >
                   <View style={styles.entryHeader}>
                     <View style={styles.entryHeaderLeft}>
-                      <IconSymbol 
-                        ios_icon_name="pawprint.fill" 
-                        android_material_icon_name="pets" 
-                        size={24} 
-                        color={colors.primary} 
-                      />
+                      <View style={[styles.iconCircle, { backgroundColor: getSuccessColor(entry.success) + '30' }]}>
+                        <IconSymbol 
+                          ios_icon_name="pawprint.fill" 
+                          android_material_icon_name="pets" 
+                          size={24} 
+                          color={getSuccessColor(entry.success)} 
+                        />
+                      </View>
                       <View style={styles.entryHeaderText}>
                         <Text style={styles.dogName}>{entry.dogName}</Text>
                         <Text style={styles.date}>{entry.date}</Text>
                       </View>
                     </View>
-                    <TouchableOpacity 
-                      onPress={() => handleDeleteEntry(entry.id)}
-                      style={styles.deleteButton}
-                    >
+                    <View style={[styles.successBadge, { backgroundColor: getSuccessColor(entry.success) }]}>
                       <IconSymbol 
-                        ios_icon_name="trash" 
-                        android_material_icon_name="delete" 
-                        size={20} 
-                        color={colors.secondary} 
+                        ios_icon_name="star.fill" 
+                        android_material_icon_name={getSuccessIcon(entry.success)} 
+                        size={14} 
+                        color={colors.text} 
                       />
-                    </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={styles.activityRow}>
-                    <Text style={styles.activityLabel}>Activity:</Text>
+                    <IconSymbol 
+                      ios_icon_name="figure.walk" 
+                      android_material_icon_name="directions-walk" 
+                      size={16} 
+                      color={colors.primary} 
+                    />
                     <Text style={styles.activityText}>{entry.activity}</Text>
+                    {entry.duration && (
+                      <>
+                        <IconSymbol 
+                          ios_icon_name="clock" 
+                          android_material_icon_name="schedule" 
+                          size={14} 
+                          color={colors.textSecondary} 
+                        />
+                        <Text style={styles.durationText}>{entry.duration}</Text>
+                      </>
+                    )}
                   </View>
 
-                  {entry.duration && (
-                    <View style={styles.durationRow}>
+                  {entry.notes && (
+                    <Text style={styles.notes} numberOfLines={2}>{entry.notes}</Text>
+                  )}
+
+                  {entry.photos && entry.photos.length > 0 && (
+                    <View style={styles.photoPreview}>
                       <IconSymbol 
-                        ios_icon_name="clock" 
-                        android_material_icon_name="schedule" 
+                        ios_icon_name="photo.fill" 
+                        android_material_icon_name="photo" 
                         size={16} 
-                        color={colors.textSecondary} 
+                        color={colors.primary} 
                       />
-                      <Text style={styles.durationText}>{entry.duration}</Text>
+                      <Text style={styles.photoCount}>{entry.photos.length} photo{entry.photos.length > 1 ? 's' : ''}</Text>
                     </View>
                   )}
 
-                  {entry.notes && (
-                    <Text style={styles.notes}>{entry.notes}</Text>
-                  )}
-
-                  <View style={[styles.successBadge, { backgroundColor: getSuccessColor(entry.success) }]}>
+                  <View style={styles.viewMoreRow}>
+                    <Text style={styles.viewMoreText}>Tap to view details</Text>
                     <IconSymbol 
-                      ios_icon_name="star.fill" 
-                      android_material_icon_name={getSuccessIcon(entry.success)} 
+                      ios_icon_name="chevron.right" 
+                      android_material_icon_name="chevron-right" 
                       size={16} 
-                      color={colors.text} 
+                      color={colors.primary} 
                     />
-                    <Text style={styles.successText}>
-                      {entry.success.charAt(0).toUpperCase() + entry.success.slice(1)} Success
-                    </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               </React.Fragment>
             ))
           )}
         </ScrollView>
       </View>
 
+      {/* Add Entry Modal */}
       <Modal
         visible={showAddModal}
         animationType="slide"
@@ -236,9 +403,9 @@ export default function TrainingLogScreen() {
               <Text style={styles.modalTitle}>Add Training Entry</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
                 <IconSymbol 
-                  ios_icon_name="xmark" 
-                  android_material_icon_name="close" 
-                  size={24} 
+                  ios_icon_name="xmark.circle.fill" 
+                  android_material_icon_name="cancel" 
+                  size={28} 
                   color={colors.text} 
                 />
               </TouchableOpacity>
@@ -254,14 +421,31 @@ export default function TrainingLogScreen() {
                 onChangeText={(text) => setNewEntry({...newEntry, dogName: text})}
               />
 
-              <Text style={styles.inputLabel}>Activity *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Leash Training, Sit Command"
-                placeholderTextColor={colors.textSecondary}
-                value={newEntry.activity}
-                onChangeText={(text) => setNewEntry({...newEntry, activity: text})}
-              />
+              <Text style={styles.inputLabel}>Activity Type *</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.activityTypeScroll}
+              >
+                {activityTypes.map((type, index) => (
+                  <React.Fragment key={index}>
+                    <TouchableOpacity
+                      style={[
+                        styles.activityTypeButton,
+                        newEntry.activity === type && styles.activityTypeButtonActive
+                      ]}
+                      onPress={() => setNewEntry({...newEntry, activity: type})}
+                    >
+                      <Text style={[
+                        styles.activityTypeText,
+                        newEntry.activity === type && styles.activityTypeTextActive
+                      ]}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  </React.Fragment>
+                ))}
+              </ScrollView>
 
               <Text style={styles.inputLabel}>Duration</Text>
               <TextInput
@@ -272,16 +456,34 @@ export default function TrainingLogScreen() {
                 onChangeText={(text) => setNewEntry({...newEntry, duration: text})}
               />
 
+              <Text style={styles.inputLabel}>Training Goals</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="What did you want to achieve?"
+                placeholderTextColor={colors.textSecondary}
+                value={newEntry.goals}
+                onChangeText={(text) => setNewEntry({...newEntry, goals: text})}
+              />
+
               <Text style={styles.inputLabel}>Notes</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Add any observations or notes"
+                placeholder="Add observations, what worked, challenges..."
                 placeholderTextColor={colors.textSecondary}
                 value={newEntry.notes}
                 onChangeText={(text) => setNewEntry({...newEntry, notes: text})}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
+              />
+
+              <Text style={styles.inputLabel}>Next Steps</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="What to work on next session?"
+                placeholderTextColor={colors.textSecondary}
+                value={newEntry.nextSteps}
+                onChangeText={(text) => setNewEntry({...newEntry, nextSteps: text})}
               />
 
               <Text style={styles.inputLabel}>Success Level</Text>
@@ -296,9 +498,15 @@ export default function TrainingLogScreen() {
                       ]}
                       onPress={() => setNewEntry({...newEntry, success: level})}
                     >
+                      <IconSymbol 
+                        ios_icon_name="star.fill" 
+                        android_material_icon_name={getSuccessIcon(level)} 
+                        size={20} 
+                        color={newEntry.success === level ? getSuccessColor(level) : colors.textSecondary} 
+                      />
                       <Text style={[
                         styles.successButtonText,
-                        newEntry.success === level && styles.successButtonTextActive
+                        newEntry.success === level && { color: getSuccessColor(level) }
                       ]}>
                         {level.charAt(0).toUpperCase() + level.slice(1)}
                       </Text>
@@ -307,13 +515,214 @@ export default function TrainingLogScreen() {
                 ))}
               </View>
 
+              <Text style={styles.inputLabel}>Photos (Optional)</Text>
+              <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
+                <IconSymbol 
+                  ios_icon_name="photo.badge.plus" 
+                  android_material_icon_name="add-photo-alternate" 
+                  size={24} 
+                  color={colors.primary} 
+                />
+                <Text style={styles.photoButtonText}>Add Photos</Text>
+              </TouchableOpacity>
+
+              {newEntry.photos && newEntry.photos.length > 0 && (
+                <ScrollView horizontal style={styles.photoPreviewScroll}>
+                  {newEntry.photos.map((photo, index) => (
+                    <React.Fragment key={index}>
+                      <View style={styles.photoPreviewItem}>
+                        <Image source={{ uri: photo }} style={styles.photoPreviewImage} />
+                        <TouchableOpacity 
+                          style={styles.removePhotoButton}
+                          onPress={() => removePhoto(index)}
+                        >
+                          <IconSymbol 
+                            ios_icon_name="xmark.circle.fill" 
+                            android_material_icon_name="cancel" 
+                            size={24} 
+                            color={colors.secondary} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </React.Fragment>
+                  ))}
+                </ScrollView>
+              )}
+
               <TouchableOpacity 
                 style={styles.saveButton}
                 onPress={handleAddEntry}
               >
+                <IconSymbol 
+                  ios_icon_name="checkmark.circle.fill" 
+                  android_material_icon_name="check-circle" 
+                  size={24} 
+                  color={colors.card} 
+                />
                 <Text style={styles.saveButtonText}>Save Entry</Text>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal
+        visible={showDetailModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedEntry && (
+              <>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{selectedEntry.dogName}</Text>
+                  <View style={styles.modalHeaderButtons}>
+                    <TouchableOpacity 
+                      onPress={() => handleDeleteEntry(selectedEntry.id)}
+                      style={styles.deleteIconButton}
+                    >
+                      <IconSymbol 
+                        ios_icon_name="trash.fill" 
+                        android_material_icon_name="delete" 
+                        size={24} 
+                        color={colors.secondary} 
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+                      <IconSymbol 
+                        ios_icon_name="xmark.circle.fill" 
+                        android_material_icon_name="cancel" 
+                        size={28} 
+                        color={colors.text} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <ScrollView style={styles.modalScroll}>
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailRow}>
+                      <IconSymbol 
+                        ios_icon_name="calendar" 
+                        android_material_icon_name="event" 
+                        size={20} 
+                        color={colors.primary} 
+                      />
+                      <Text style={styles.detailLabel}>Date:</Text>
+                      <Text style={styles.detailValue}>{selectedEntry.date}</Text>
+                    </View>
+
+                    <View style={styles.detailRow}>
+                      <IconSymbol 
+                        ios_icon_name="figure.walk" 
+                        android_material_icon_name="directions-walk" 
+                        size={20} 
+                        color={colors.primary} 
+                      />
+                      <Text style={styles.detailLabel}>Activity:</Text>
+                      <Text style={styles.detailValue}>{selectedEntry.activity}</Text>
+                    </View>
+
+                    {selectedEntry.duration && (
+                      <View style={styles.detailRow}>
+                        <IconSymbol 
+                          ios_icon_name="clock" 
+                          android_material_icon_name="schedule" 
+                          size={20} 
+                          color={colors.primary} 
+                        />
+                        <Text style={styles.detailLabel}>Duration:</Text>
+                        <Text style={styles.detailValue}>{selectedEntry.duration}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.detailRow}>
+                      <IconSymbol 
+                        ios_icon_name="star.fill" 
+                        android_material_icon_name={getSuccessIcon(selectedEntry.success)} 
+                        size={20} 
+                        color={getSuccessColor(selectedEntry.success)} 
+                      />
+                      <Text style={styles.detailLabel}>Success:</Text>
+                      <View style={[styles.successBadge, { backgroundColor: getSuccessColor(selectedEntry.success) }]}>
+                        <Text style={styles.successText}>
+                          {selectedEntry.success.charAt(0).toUpperCase() + selectedEntry.success.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {selectedEntry.goals && (
+                    <View style={styles.detailCard}>
+                      <View style={styles.detailCardHeader}>
+                        <IconSymbol 
+                          ios_icon_name="target" 
+                          android_material_icon_name="flag" 
+                          size={20} 
+                          color={colors.accent} 
+                        />
+                        <Text style={styles.detailCardTitle}>Training Goals</Text>
+                      </View>
+                      <Text style={styles.detailCardText}>{selectedEntry.goals}</Text>
+                    </View>
+                  )}
+
+                  {selectedEntry.notes && (
+                    <View style={styles.detailCard}>
+                      <View style={styles.detailCardHeader}>
+                        <IconSymbol 
+                          ios_icon_name="note.text" 
+                          android_material_icon_name="notes" 
+                          size={20} 
+                          color={colors.primary} 
+                        />
+                        <Text style={styles.detailCardTitle}>Notes</Text>
+                      </View>
+                      <Text style={styles.detailCardText}>{selectedEntry.notes}</Text>
+                    </View>
+                  )}
+
+                  {selectedEntry.nextSteps && (
+                    <View style={styles.detailCard}>
+                      <View style={styles.detailCardHeader}>
+                        <IconSymbol 
+                          ios_icon_name="arrow.right.circle.fill" 
+                          android_material_icon_name="arrow-circle-right" 
+                          size={20} 
+                          color={colors.highlight} 
+                        />
+                        <Text style={styles.detailCardTitle}>Next Steps</Text>
+                      </View>
+                      <Text style={styles.detailCardText}>{selectedEntry.nextSteps}</Text>
+                    </View>
+                  )}
+
+                  {selectedEntry.photos && selectedEntry.photos.length > 0 && (
+                    <View style={styles.detailCard}>
+                      <View style={styles.detailCardHeader}>
+                        <IconSymbol 
+                          ios_icon_name="photo.fill" 
+                          android_material_icon_name="photo-library" 
+                          size={20} 
+                          color={colors.secondary} 
+                        />
+                        <Text style={styles.detailCardTitle}>Photos</Text>
+                      </View>
+                      <ScrollView horizontal style={styles.photoGallery}>
+                        {selectedEntry.photos.map((photo, index) => (
+                          <React.Fragment key={index}>
+                            <Image source={{ uri: photo }} style={styles.galleryImage} />
+                          </React.Fragment>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </ScrollView>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -335,7 +744,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 48 : 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 28,
@@ -349,13 +758,69 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: colors.primary,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 2px 8px rgba(100, 149, 237, 0.3)',
+    boxShadow: '0px 4px 12px rgba(100, 149, 237, 0.4)',
+    elevation: 5,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  filterContainer: {
+    maxHeight: 50,
+    marginBottom: 12,
+  },
+  filterContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+  },
+  filterButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  filterButtonTextActive: {
+    color: colors.card,
   },
   scrollView: {
     flex: 1,
@@ -383,10 +848,10 @@ const styles = StyleSheet.create({
   },
   entryCard: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.textSecondary + '40',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
@@ -402,12 +867,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   entryHeaderText: {
     marginLeft: 12,
   },
   dogName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
   },
   date: {
@@ -415,33 +887,21 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  deleteButton: {
-    padding: 8,
-  },
   activityRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  activityLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginRight: 8,
-  },
-  activityText: {
-    fontSize: 14,
-    color: colors.text,
-    flex: 1,
-  },
-  durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
+  },
+  activityText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    flex: 1,
   },
   durationText: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
-    marginLeft: 6,
   },
   notes: {
     fontSize: 14,
@@ -449,19 +909,41 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
+  photoPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  photoCount: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  viewMoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 4,
+  },
+  viewMoreText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '600',
+  },
   successBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+    gap: 4,
   },
   successText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
-    marginLeft: 6,
   },
   modalOverlay: {
     flex: 1,
@@ -470,8 +952,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '90%',
   },
   modalHeader: {
@@ -483,24 +965,32 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.textSecondary + '40',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  modalHeaderButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  deleteIconButton: {
+    padding: 4,
   },
   modalScroll: {
     padding: 20,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
     marginBottom: 8,
     marginTop: 12,
   },
   input: {
     backgroundColor: colors.card,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
     color: colors.text,
     borderWidth: 1,
@@ -509,43 +999,162 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
   },
+  activityTypeScroll: {
+    marginBottom: 8,
+  },
+  activityTypeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+    marginRight: 8,
+  },
+  activityTypeButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  activityTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  activityTypeTextActive: {
+    color: colors.card,
+  },
   successButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   successButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 2,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
     backgroundColor: colors.card,
+    gap: 6,
   },
   successButtonActive: {
-    backgroundColor: colors.primary + '20',
+    backgroundColor: colors.background,
   },
   successButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
-  successButtonTextActive: {
-    color: colors.primary,
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    gap: 10,
+  },
+  photoButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  photoPreviewScroll: {
+    marginTop: 12,
+  },
+  photoPreviewItem: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  photoPreviewImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
+    marginTop: 24,
     marginBottom: 40,
-    boxShadow: '0px 2px 8px rgba(100, 149, 237, 0.3)',
-    elevation: 3,
+    gap: 10,
+    boxShadow: '0px 4px 12px rgba(100, 149, 237, 0.4)',
+    elevation: 5,
   },
   saveButtonText: {
     color: colors.card,
     fontSize: 18,
+    fontWeight: '700',
+  },
+  detailSection: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+  detailLabel: {
+    fontSize: 14,
     fontWeight: '600',
+    color: colors.textSecondary,
+    width: 80,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: colors.text,
+    flex: 1,
+  },
+  detailCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '40',
+  },
+  detailCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+  detailCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  detailCardText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 22,
+  },
+  photoGallery: {
+    marginTop: 8,
+  },
+  galleryImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    marginRight: 12,
   },
 });
